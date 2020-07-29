@@ -25,7 +25,7 @@ Remote script:
 Developed by extending the tcpoverudp.pl "Forward TCP connections over UDP without root" by Jan Kratochvil by adding packet duplication over two network interfaces.
 
 **Summary:**        Forward TCP connections using UDP over two network interfaces in parallel (without root).
-<br>**License:**    GNU General Public License
+<br>**License:**    GNU General Public License ver 2
 <br>**State:**      Ready to use. Maintained and in active use.
 <br>**Source:**     https://github.com/levitation/tcpoverudp2
 <br>**See also:**   Tcpoverudp     https://www.jankratochvil.net/project/tcpoverudp/
