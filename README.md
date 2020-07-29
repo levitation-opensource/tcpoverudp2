@@ -1,6 +1,6 @@
 ## tcpoverudp2 - TCP over dual UDP: Forward TCP connections using UDP over two network interfaces in parallel
 
-The use case for this software is when you can use two network connections (for example, mobile or wifi), but both of them have packet loss issues, and you want to have a stable and fast internet.
+The use case for this software is when you can use two network connections (for example, mobile or wifi), but both of them are unstable and have packet loss issues, and you still want to have a stable and fast internet.
 
 Do both of your available network links suffer from a high packet loss? Do you have a server account in public internet with perl scripting support? Then this tool can provide you a reliable fast TCP (for example, for web proxy + SSH) connectivity - by constantly duplicating packets over two interfaces and retrying transmissions on links of any quality.
 
