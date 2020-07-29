@@ -1,4 +1,4 @@
-## tcpoverudp2: Forward TCP connections using UDP over two network interfaces in parallel (without root)
+## tcpoverudp2: Forward TCP connections using UDP over two network interfaces in parallel
 
 Does your link suffer from a high packet loss? Do you have a account in public Internet with perl scripting support? This tool can provide you a reliable fast TCP (web proxy + SSH) connectivity while constantly retrying transmissions on link of any quality.
 
