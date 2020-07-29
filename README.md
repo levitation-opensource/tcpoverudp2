@@ -2,7 +2,7 @@
 
 The use case for this software is when you can use two network connections (for example, mobile or wifi), but both of them are unstable and have packet loss issues, and you still want to have a stable and fast internet.
 
-Do both of your available network links suffer from a high packet loss? Do you have a server account in public internet with perl scripting support? Then this tool can provide you a reliable fast TCP (for example, for web proxy + SSH) connectivity - by constantly duplicating packets over two interfaces and retrying transmissions on links of any quality.
+Do both of your available network links suffer from a high packet loss? Do you have a server account in public internet with perl scripting support? Then this tool can provide you a reliable fast TCP (for example, for web proxy + SSH) connectivity - by constantly duplicating all the packets over two interfaces and retrying transmissions on links of any quality.
 
 The algorithm sends clones of all packets over two network interfaces concurrently in order to ensure that the forwarded connection works as reliably as possible regardless of intermittent packet loss in either of the interfaces - assuming that the packet loss on either of the interfaces usually happens at unrelated moments.
 
