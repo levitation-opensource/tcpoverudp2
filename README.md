@@ -1,4 +1,4 @@
-## tcpoverudp2: Forward TCP connections using UDP over two network interfaces in parallel
+## tcpoverudp2 - TCP over dual UDP: Forward TCP connections using UDP over two network interfaces in parallel
 
 The use case for this software is when you can use two network connections (for example, mobile or wifi), but both of them have packet loss issues, and you want to have a stable and fast internet.
 
