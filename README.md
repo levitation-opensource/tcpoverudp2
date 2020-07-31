@@ -24,8 +24,8 @@ Server script:
 Firewall configuration at server side:
 
     Open / forward the following two UDP ports:
-	-- udp-listen-port
-	-- udp-listen-port+1
+	1. udp-listen-port
+	2. udp-listen-port+1
 
 
 ### Additional info:
