@@ -8,18 +8,24 @@ The algorithm sends clones of all packets over two network interfaces concurrent
 
 ### Usage:
 
-Local script:
+Client script:
 
 	./tcpoverudp2 --timeout=0.05 
                      --tcp-listen-port=8128 8122 \
                      --udp-server-addr=your.public.server.com --udp-server-port=8120 \
                      --udp-send-local-addr1=192.168.1.20 --udp-send-local-addr2=192.168.2.15
 
-Remote script:
+Server script:
 
 	./tcpoverudp2 --udp-listen-port=8120 \
                     --tcp-forward-addr=public.web.proxy --tcp-forward-port=3128 \
                     --tcp-forward-addr=127.0.0.1 --tcp-forward-port=22
+
+Firewall configuration at server side:
+
+        Open / forward the following two UDP ports:
+	-- udp-listen-port
+	-- udp-listen-port+1
 
 
 ### Additional info:
