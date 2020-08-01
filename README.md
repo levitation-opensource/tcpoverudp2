@@ -21,7 +21,7 @@ Server script:
                     --tcp-forward-addr=public.web.proxy --tcp-forward-port=3128 \
                     --tcp-forward-addr=127.0.0.1 --tcp-forward-port=22
 
-Firewall configuration at server side:
+Firewall configuration at server side (tcpoverudp2 needs to use two consecutive UDP port numbers):
 
     Open / forward the following __two__ UDP ports:
 	1. udp-listen-port
