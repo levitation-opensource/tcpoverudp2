@@ -30,7 +30,7 @@ Firewall configuration at server side (tcpoverudp2 needs to use <ins>two consecu
 
 ### Additional info:
 
-Developed by extending the tcpoverudp.pl "Forward TCP connections over UDP without root" by Jan Kratochvil by adding packet duplication over two network interfaces.
+Developed by extending the tcpoverudp.pl *"Forward TCP connections over UDP without root" by Jan Kratochvil* by adding packet duplication over two network interfaces.
 
 **Summary:**        Forward TCP connections using UDP over two network interfaces in parallel (without root).
 <br>**License:**    GNU General Public License ver 2
