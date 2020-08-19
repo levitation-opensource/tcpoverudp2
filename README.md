@@ -6,7 +6,10 @@ Do both of your available network links suffer from a high packet loss? Do you h
 
 The algorithm sends clones of all packets over two network interfaces concurrently in order to ensure that the forwarded connection works as reliably as possible regardless of intermittent packet loss in either of the interfaces - assuming that the packet loss on either of the interfaces usually happens at unrelated moments.
 
-### Usage:
+### State 
+Ready to use. Maintained and in active use.
+
+### Usage
 
 Client script for Linux (Windows client example can be found in client.bat):
 
