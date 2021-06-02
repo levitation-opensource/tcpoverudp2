@@ -1,7 +1,7 @@
 #! /usr/bin/perl
 #
 # $Id$
-# Copyright (C) 2019-2021 Roland Pihlakas <roland@simplify.ee>
+# Copyright (C) 2019-2020 Roland Pihlakas <roland@simplify.ee>
 #
 # Developed by extending the code by
 #
@@ -171,7 +171,7 @@ sub filter_stats($)
 my $peer_addr1;
 my $peer_addr2;
 
-my $MAGIC=0x4798F63C;
+my $MAGIC=0x97AEBFDD;
 
 sub sendpkt($;$)
 {
