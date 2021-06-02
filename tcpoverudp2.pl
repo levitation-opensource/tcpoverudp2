@@ -1,7 +1,7 @@
 #! /usr/bin/perl
 #
 # $Id$
-# Copyright (C) 2019-2020 Roland Pihlakas <roland@simplify.ee>
+# Copyright (C) 2019-2021 Roland Pihlakas <roland@simplify.ee>
 #
 # Developed by extending the code by
 #
@@ -154,7 +154,7 @@ sub stats($)
 	return if $now<$last+1 && !$D;
 	$last=$now;
 	
-	print join(" ","stats:",map(("$_=".$stats{$_}),sort keys(%stats))).($D ? "\r" : "\r");
+	print join(" ", "", map(("$_=".$stats{$_}), sort keys(%stats))) . ($D ? "\r" : "\r");
 }
 
 sub filter_stats($)
@@ -171,7 +171,7 @@ sub filter_stats($)
 my $peer_addr1;
 my $peer_addr2;
 
-my $MAGIC=0x97AEBFDD;
+my $MAGIC=0x4798F63C;
 
 sub sendpkt($;$)
 {
@@ -205,7 +205,7 @@ sub sendpkt($;$)
 					$send1a=1;
 				}
 				else {
-					stats(filter_stats($stats . "1a") || "sentok1a");
+					stats(filter_stats($stats . "1a") || "senok1a");
 				}
 			}
 
@@ -217,7 +217,7 @@ sub sendpkt($;$)
 					$send1b=1;
 				}
 				else {
-					stats(filter_stats($stats . "1b") || "sentok1b");
+					stats(filter_stats($stats . "1b") || "senok1b");
 				}
 			}
 		}
@@ -232,7 +232,7 @@ sub sendpkt($;$)
 					$send2a=1;
 				} 
 				else {
-					stats(filter_stats($stats . "2a") || "sentok2a");
+					stats(filter_stats($stats . "2a") || "senok2a");
 				}
 			}
 
@@ -244,13 +244,13 @@ sub sendpkt($;$)
 					$send2b=1;
 				} 
 				else {
-					stats(filter_stats($stats . "2b") || "sentok2b");
+					stats(filter_stats($stats . "2b") || "senok2b");
 				}
 			}
 		}
 	}
 	
-	# stats($stats||"sentok");
+	# stats($stats||"senok");
 }
 
 sub printable($)
@@ -391,8 +391,8 @@ for (;;) {
 		# @tcp_sockets_ready = $tcp_select->can_read($remaining_read_time);
 		my ($tcp_sockets_ready, $udp_sockets_ready) = IO::Select->select($tcp_select, $select, undef, $remaining_read_time);
 		
-		# if (! scalar(@tcp_sockets_ready)) {
-		if (! scalar(@$tcp_sockets_ready)) {
+		# if (!defined $tcp_sockets_ready || ! scalar(@tcp_sockets_ready)) {
+		if (!defined $tcp_sockets_ready || ! scalar(@$tcp_sockets_ready)) {
 			# print "TCP timeout\n";
 			# goto send_tcp;
 			
@@ -522,8 +522,8 @@ for (;;) {
 		
 		$sockets_were_ready = 0;
 			
-		# if (! scalar(@sockets_ready)) {
-		if (! scalar(@$sockets_ready)) {
+		# if (!defined $sockets_ready || ! scalar(@sockets_ready)) {
+		if (!defined $sockets_ready || ! scalar(@$sockets_ready)) {
 			# print "Timeout\n";
 			
 		} else {
@@ -542,11 +542,13 @@ for (;;) {
 						stats("recverr2");
 					}
 					# last;
+
+					# $got_addr = "";		# comparison to undefined string would cause error in below code
 				}
 
 				# $peer_addr||=$got_addr;
 				
-				if ($socket == $sock_udp1 && (!$peer_addr1 || $peer_addr1 ne $got_addr)) {
+				if ($socket == $sock_udp1 && $got_addr && (!$peer_addr1 || $peer_addr1 ne $got_addr)) {
 					$peer_addr1=$got_addr;
 					# print "Peer_addr1: " . $peer_addr1 . "\n";
 					
@@ -554,7 +556,7 @@ for (;;) {
 					$back_host1=inet_ntoa $back_host1;
 					print "\nPeer server: $back_host1:$back_port1\n";
 				}
-				elsif ($socket == $sock_udp2 && (!$peer_addr2 || $peer_addr2 ne $got_addr)) {
+				elsif ($socket == $sock_udp2 && $got_addr && (!$peer_addr2 || $peer_addr2 ne $got_addr)) {
 					$peer_addr2=$got_addr;
 					# print "Peer_addr2: " . $peer_addr2 . "\n";
 					
@@ -648,9 +650,9 @@ for (;;) {
 					sendpkt pack("CNN",$TYPE_ACK,$id,0);
 					
 					if ($socket == $sock_udp1) {
-						stats("ackout1");
+						stats("oackout1");
 					} elsif ($socket == $sock_udp2) {
-						stats("ackout2");
+						stats("oackout2");
 					}
 					
 				} elsif ($type==$TYPE_SEND) {
@@ -660,6 +662,7 @@ for (;;) {
 					my $hashref=$sock{$id};
 					
 					if (!$hashref) {
+					
 						# cluck "Got SEND but for nonexisting sock $id";
 						# stats("ufosock");
 
@@ -672,6 +675,7 @@ for (;;) {
 					} else {
 					
 						warn "Got SEND(id=$id,seq=$seq (acked_to_udp=".$hashref->{"acked_to_udp"}."),data=".printable($udp_data).")" if $D;
+						
 						if ($hashref->{"acked_to_udp"}+1>$seq) {
 						
 							if ($socket == $sock_udp1) {
@@ -687,6 +691,7 @@ for (;;) {
 							
 								if (length($udp_data)==((syswrite $hashref->{"stream"},$udp_data,length($udp_data)) || 0)) {
 									warn "Wrote TCP data (id=$id,acked_to_udp=seq=$seq,data=".printable($udp_data).")" if $D;
+									
 								} else {
 									my $seqclose=++$hashref->{"sent_to_udp"};
 									$hashref->{"sent_queue"}{$seqclose}=seq_new(undef());
@@ -698,28 +703,39 @@ for (;;) {
 							$hashref->{"acked_to_udp"}=$seq;
 						
 							if ($socket == $sock_udp1) {
-								stats("recvok1");
+								stats("recok1");
 							} elsif ($socket == $sock_udp2) {
-								stats("recvok2");
+								stats("recok2");
 							}
 							
 							warn "In order - got SEND (id=$id,seq=$seq (acked_to_udp=".$hashref->{"acked_to_udp"}.")" if $D && $D>=2;
 							
 							if (($try_retry=$hashref->{"incoming"}{$seq+1})) {
+							
 								delete $hashref->{"incoming"}{$seq+1};
 								warn "Reinserted, retrying" if $D && $D>=2;
 							}
 						}
 						
 						if ($hashref->{"acked_to_udp"}+1<$seq) {
+						
 							warn "Out of order - got SEND (id=$id,seq=$seq (acked_to_udp=".$hashref->{"acked_to_udp"}.")" if $D && $D>=2;
 							$hashref->{"incoming"}{$seq}=$udp_data_orig;
 						}
 					}
+					
 					if (!$hashref || $hashref->{"acked_to_udp"}+1>=$seq) {
 					
+						# TODO!!! aggregate with next send packet
+						
 						sendpkt pack("CNN",$TYPE_ACK,$id,$seq);
 						warn "Sent ACK (id=$id,seq=$seq)" if $D;
+					
+						if ($socket == $sock_udp1) {
+							stats("ackout1");
+						} elsif ($socket == $sock_udp2) {
+							stats("ackout2");
+						}
 					}
 					
 					goto retry if $try_retry;
@@ -739,9 +755,11 @@ for (;;) {
 								
 						# last;
 					}
+					
 					my($seq);
 					($seq,$udp_data)=unpack "Na*",$udp_data;
 					warn "Got ACK (id=$id,seq=$seq)" if $D;
+					
 					die if $udp_data;
 					###exists $hashref->{"sent_queue"}{$seq} or confess "Nonexisting queue of $id: $seq";
 					
@@ -750,6 +768,7 @@ for (;;) {
 						my $data=$hashref->{"sent_queue"}{$seq}{"data"};
 						die if !$seq && defined $data;
 						die if $seq && defined $data && $data eq "";
+						
 						delete $hashref->{"sent_queue"}{$seq};
 						if ($seq && !defined $data) {
 							delete $active{$id};
@@ -814,8 +833,15 @@ for (;;) {
 					}
 					
 					if (!$hashref || $hashref->{"acked_to_udp"}+1>=$seq) {
+					
 						sendpkt pack("CNN",$TYPE_ACK,$id,$seq);
 						warn "Sent ACK of close (id=$id,seq=$seq)" if $D;
+					
+						if ($socket == $sock_udp1) {
+							stats("cackout1");
+						} elsif ($socket == $sock_udp2) {
+							stats("cackout2");
+						}
 					}
 					
 				} else {
@@ -845,17 +871,17 @@ for (;;) {
 				if ($seq==0) {
 					die if defined $data;
 					warn "Resent OPEN (id=$id)" if $D;
-					sendpkt pack("CNN",$TYPE_OPEN,$id,$hashref->{"which"}),"sentdup";
+					sendpkt pack("CNN",$TYPE_OPEN,$id,$hashref->{"which"}),"sendup";
 					
 				} elsif (defined $data) {
 					die if $data eq "";
 					# print "ERR: data eq ''" if $data eq "";
 					warn "Resent SEND (id=$id,seq=$seq)" if $D;
-					sendpkt pack("CNNa*",$TYPE_SEND,$id,$seq,$data),"sentdup";
+					sendpkt pack("CNNa*",$TYPE_SEND,$id,$seq,$data),"sendup";
 					
 				} else {	# pending CLOSE
 					warn "Resent CLOSE (id=$id,seq=$seq)" if $D;
-					sendpkt pack("CNN",$TYPE_CLOSE,$id,$seq),"sentdup";
+					sendpkt pack("CNN",$TYPE_CLOSE,$id,$seq),"sendup";
 				}
 				
 				$when=$seqhashref->{"timeout"}=time()+$opt_timeout;
