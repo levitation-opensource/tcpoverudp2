@@ -1,7 +1,7 @@
 #! /usr/bin/perl
 #
 # $Id$
-# Copyright (C) 2019-2020 Roland Pihlakas <roland@simplify.ee>
+# Copyright (C) 2019-2021 Roland Pihlakas <roland@simplify.ee>
 #
 # Developed by extending the code by
 #
