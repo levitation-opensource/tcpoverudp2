@@ -31,7 +31,7 @@ use Time::HiRes ('sleep');
 use Fcntl;
 use Carp qw(cluck confess);
 use Socket;
-use Time::HiRes qw(time);
+use Time::HiRes qw(time sleep usleep);
 
 
 # my $READ_SIZE=1492; # 256;	# 96kbit = 47 x 256B
@@ -322,6 +322,7 @@ my $earliest;
 my $sockets_were_ready=0;
 my $time1=0;
 my $time2=0;
+my $last_recv=0;
 
 for (;;) {
 	my $rfds="";
@@ -341,7 +342,7 @@ for (;;) {
 	my $periodic_remaining;
 	my $now=time();
 	$periodic_remaining=($earliest>$now ? $earliest-$now : 0) if $earliest;
-	my $got=select $rfds,undef(),undef(),$periodic_remaining;
+	my $got=select($rfds,undef(),undef(),$periodic_remaining);
 	###warn "got from select." if $D;
 	die "Invalid select(2): ".Dumper($got) if !defined $got || $got<0;
 
@@ -349,15 +350,15 @@ for (;;) {
 		my $sock_tcp=$sock_tcp[$which];
 		next if !vec($rfds,fileno($sock_tcp),1);
 		my $sock_tcp_new;
-		accept $sock_tcp_new,$sock_tcp or confess "Error accepting new TCP socket: $!";
+		accept($sock_tcp_new,$sock_tcp) or confess "Error accepting new TCP socket: $!";
 		my $id=id_new();
 		print "New id: " . $id . "\n";
 		warn "Accepted new TCP (id=$id)" if $D;
-		my $old=select $sock_tcp_new;
+		my $old=select($sock_tcp_new);
 		$|=1;
-		select $old;
-		sock_new $id,$which,$sock_tcp_new;
-		sendpkt pack("CNN",$TYPE_OPEN,$id,$which);
+		select($old);
+		sock_new($id,$which,$sock_tcp_new);
+		sendpkt(pack("CNN",$TYPE_OPEN,$id,$which));
 		warn "Sent OPEN (id=$id)" if $D;
 	}
 	
@@ -382,7 +383,7 @@ for (;;) {
 		my $got = 0;
 		
 	read_more:
-			# fcntl($hashref->{"stream"},F_SETFL,O_NONBLOCK) or die "fnctl(,F_SETFL,O_NONBLOCK)";
+		# fcntl($hashref->{"stream"},F_SETFL,O_NONBLOCK) or die "fnctl(,F_SETFL,O_NONBLOCK)";
 		
 		my $tcp_socket1 = $hashref->{"stream"};
 		my $tcp_select = new IO::Select();
@@ -406,40 +407,46 @@ for (;;) {
 				warn "Got TCP data (id=$id,got=$got)" if $D;
 				my $seq=++$hashref->{"sent_to_udp"};
 				$hashref->{"sent_queue"}{$seq}=seq_new($combined_buf);
-				sendpkt pack("CNNa*",$TYPE_SEND,$id,$seq,$combined_buf);
+				sendpkt(pack("CNNa*",$TYPE_SEND,$id,$seq,$combined_buf));
 				warn "Sent SEND (id=$id,seq=$seq,data=".printable($combined_buf).")" if $D;
+
+				$last_recv = time();
 				
 			}  	# if (length $combined_buf > 0) {
 			
 		} else {
-        		# foreach my $tcp_socket (@tcp_sockets_ready) {
-        		foreach my $tcp_socket (@$tcp_sockets_ready) {
+
+        	# foreach my $tcp_socket (@tcp_sockets_ready) {
+        	foreach my $tcp_socket (@$tcp_sockets_ready) {
 		
 				# $tcp_socket->setsockopt( SOL_SOCKET, SO_RCVTIMEO, $remaining_read_time );
 				# my $got=sysread $tcp_socket,$buf,$remaining_read_size;
-				my $got_addr=recv $tcp_socket,$buf,$remaining_read_size,0;
+				my $got_addr=recv($tcp_socket, $buf, $remaining_read_size, 0);
 				
 				$got = length $buf;
 
-					# fcntl($hashref->{"stream"},F_SETFL,0)          or die "fnctl(,F_SETFL,0)";
-					#defined($got) or confess "Error reading TCP socket: $!";
+				# fcntl($hashref->{"stream"},F_SETFL,0)          or die "fnctl(,F_SETFL,0)";
+				#defined($got) or confess "Error reading TCP socket: $!";
 
 				# send_tcp:
 				# if (!$got && length $combined_buf == 0) {
 				# 	print "Got TCP EOF/error (id=$id)"; # if $D;
 				# 	my $seq=++$hashref->{"sent_to_udp"};
 				# 	$hashref->{"sent_queue"}{$seq}=seq_new(undef());
-				# 	sendpkt pack("CNN",$TYPE_CLOSE,$id,$seq);
+				# 	sendpkt(pack("CNN",$TYPE_CLOSE,$id,$seq));
 				# 	close $hashref->{"stream"} or confess "Error closing local socket: $!";
 				# 	delete $hashref->{"stream"};
 				# 	warn "Sent CLOSE (id=$id,seq=$seq)" if $D;
 				# } else { 	# if ($got==length $buf) {
+
+					my $now2 = time();
 
 					if (!$combined_buf) {
 					
 						$combined_buf = $buf;
 						if (length $buf > 0) {
 							stats("tcpin");
+							$last_recv = $now2;
 						}
 					}
 					elsif (!$got) {
@@ -449,13 +456,14 @@ for (;;) {
 						$combined_buf = $combined_buf . $buf;
 						if (length $buf > 0) {
 							stats("tcpin");
+							$last_recv = $now2;
 						}
 					}
 					
 					$got = length $combined_buf;
 					
 
-					$read_time = time() - $read_start_time;			
+					$read_time = $now2 - $read_start_time;			
 					if ($got < $READ_SIZE && $read_time < $aggregation_timeout) {
 					
 						if ( !scalar(@$udp_sockets_ready)) {
@@ -464,6 +472,9 @@ for (;;) {
 							$remaining_read_time = $aggregation_timeout - $read_time;
 							# print "Got " . $got . " remaining time: " . $remaining_read_time . "\n";
 							goto read_more;	
+						}
+						elsif ($got == 0 && $now2 - $last_recv > $aggregation_timeout * 2) {   # NB! avoid busy-looping when TCP client connection is dropped
+							IO::Select->select(undef, undef, undef, $aggregation_timeout);
 						}
 					}
 
@@ -474,7 +485,7 @@ for (;;) {
 						warn "Got TCP data (id=$id,got=$got)" if $D;
 						my $seq=++$hashref->{"sent_to_udp"};
 						$hashref->{"sent_queue"}{$seq}=seq_new($combined_buf);
-						sendpkt pack("CNNa*",$TYPE_SEND,$id,$seq,$combined_buf);
+						sendpkt(pack("CNNa*",$TYPE_SEND,$id,$seq,$combined_buf));
 						warn "Sent SEND (id=$id,seq=$seq,data=".printable($combined_buf).")" if $D;
 					}
 				# } 
@@ -495,21 +506,21 @@ for (;;) {
 		$time2 = time();
 		
 		
-		if (!$opt_udp_listen_port && ($sockets_were_ready==0 || $time2 - $time1 >= 0.02)) {
+		# if (!$opt_udp_listen_port && ($sockets_were_ready==0 || $time2 - $time1 >= $aggregation_timeout / 2)) {
 		# if ($sockets_were_ready==0 || $time2 - $time1 >= 0.01) {
 		
 			# print "Time: " . ($time2 - $time1) . "\n";
 			# print "Sleeping: " . time() . "\n";
 			
-			my $pause = $time2 - $time1;
-			if ($pause > 0.05) {
-				$pause = 0.05;
-			}
+			# my $pause = $time2 - $time1;
+			# if ($pause > $aggregation_timeout) {
+			# 	$pause = $aggregation_timeout;
+			# }
 			
 			# sleep($pause);
 			
-			$time2 = time();
-		}
+			# $time2 = time();
+		# }
 		
 		$time1 = $time2;
 				
@@ -532,7 +543,7 @@ for (;;) {
 			
 				$sockets_were_ready = 1;
 
-				my $got_addr=recv $socket,$udp_data,0x10000,0;
+				my $got_addr=recv($socket, $udp_data, 0x10000, 0);
 				
 				if (!$got_addr) {
 					# cluck "Error receiving UDP data: $!";
@@ -629,13 +640,13 @@ for (;;) {
 						);
 						
 						if (!$sock_tcp_new) {
-							sendpkt pack("CNN",$TYPE_CLOSE,$id,1);
+							sendpkt(pack("CNN",$TYPE_CLOSE,$id,1));
 							warn "Refused back OPEN by CLOSE (id=$id,seq=1)" if $D;
 						} else {
-							my $old=select $sock_tcp_new;
+							my $old=select($sock_tcp_new);
 							$|=1;
-							select $old;
-							sock_new $id,$which,$sock_tcp_new;
+							select($old);
+							sock_new($id,$which,$sock_tcp_new);
 							
 							# stats("openok");
 							
@@ -647,7 +658,7 @@ for (;;) {
 						}
 					}	#/ if (!$sock{$id}) {
 					
-					sendpkt pack("CNN",$TYPE_ACK,$id,0);
+					sendpkt(pack("CNN",$TYPE_ACK,$id,0));
 					
 					if ($socket == $sock_udp1) {
 						stats("oackout1");
@@ -696,7 +707,7 @@ for (;;) {
 									my $seqclose=++$hashref->{"sent_to_udp"};
 									$hashref->{"sent_queue"}{$seqclose}=seq_new(undef());
 									warn "Refusing back OPEN by CLOSE (id=$id,seqclose=$seqclose)" if $D;
-									sendpkt pack("CNN",$TYPE_CLOSE,$id,$seqclose);
+									sendpkt(pack("CNN",$TYPE_CLOSE,$id,$seqclose));
 								}
 							}
 							
@@ -728,7 +739,7 @@ for (;;) {
 					
 						# TODO!!! aggregate with next send packet
 						
-						sendpkt pack("CNN",$TYPE_ACK,$id,$seq);
+						sendpkt(pack("CNN",$TYPE_ACK,$id,$seq));
 						warn "Sent ACK (id=$id,seq=$seq)" if $D;
 					
 						if ($socket == $sock_udp1) {
@@ -737,8 +748,11 @@ for (;;) {
 							stats("ackout2");
 						}
 					}
-					
-					goto retry if $try_retry;
+
+					if ($try_retry) {
+
+						goto retry;
+					}
 					
 				} elsif ($type==$TYPE_ACK) {
 				
@@ -834,7 +848,7 @@ for (;;) {
 					
 					if (!$hashref || $hashref->{"acked_to_udp"}+1>=$seq) {
 					
-						sendpkt pack("CNN",$TYPE_ACK,$id,$seq);
+						sendpkt(pack("CNN",$TYPE_ACK,$id,$seq));
 						warn "Sent ACK of close (id=$id,seq=$seq)" if $D;
 					
 						if ($socket == $sock_udp1) {
@@ -871,17 +885,17 @@ for (;;) {
 				if ($seq==0) {
 					die if defined $data;
 					warn "Resent OPEN (id=$id)" if $D;
-					sendpkt pack("CNN",$TYPE_OPEN,$id,$hashref->{"which"}),"sendup";
+					sendpkt(pack("CNN",$TYPE_OPEN,$id,$hashref->{"which"}), "sendup");
 					
 				} elsif (defined $data) {
 					die if $data eq "";
 					# print "ERR: data eq ''" if $data eq "";
 					warn "Resent SEND (id=$id,seq=$seq)" if $D;
-					sendpkt pack("CNNa*",$TYPE_SEND,$id,$seq,$data),"sendup";
+					sendpkt(pack("CNNa*",$TYPE_SEND,$id,$seq,$data), "sendup");
 					
 				} else {	# pending CLOSE
 					warn "Resent CLOSE (id=$id,seq=$seq)" if $D;
-					sendpkt pack("CNN",$TYPE_CLOSE,$id,$seq),"sendup";
+					sendpkt(pack("CNN",$TYPE_CLOSE,$id,$seq), "sendup");
 				}
 				
 				$when=$seqhashref->{"timeout"}=time()+$opt_timeout;
